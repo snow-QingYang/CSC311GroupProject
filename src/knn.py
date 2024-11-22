@@ -60,7 +60,14 @@ def knn_impute_by_item(matrix, valid_data, k):
     #####################################################################
     return acc
 
-
+def plot_result(k_values, val_accuracies, name ):
+    plt.plot(k_values, val_accuracies, marker='o')
+    plt.xlabel("k_value")
+    plt.ylabel("Validation Accuracy")
+    plt.title("Validation Accuracy vs K")
+    plt.grid(True)
+    plt.legend()
+    plt.savefig(name)
 def main():
     sparse_matrix = load_train_sparse("./data").toarray()
     val_data = load_valid_csv("./data")
@@ -78,18 +85,34 @@ def main():
     # chosen k*.                                                        #
     #####################################################################
     # Try different k values and record validation accuracy
-    k_values = [1, 6, 11, 16, 21, 26]
-    val_accuracy = []
+    user_based_k_values = [1, 6, 11, 16, 21, 26]
+    user_based_val_accuracy = []
+    item_based_k_values = [1, 6, 11, 16, 21, 26]
+    item_based_val_accuracy = []
+    # user_based 
+    for k in user_based_k_values:
+        print("\nk = {}:".format(k))
+        acc = knn_impute_by_user(sparse_matrix, val_data, k)
+        user_based_val_accuracy.append(acc)
     
-    for k in k_values:
+    best_k = user_based_k_values[np.argmax(user_based_val_accuracy)]
+    print("\nUser-based best k : {}".format(best_k))
+    # Evaluate on test set with the best k value
+    print("\nUsing k = {} on test set:".format(best_k))
+    test_acc = knn_impute_by_user(sparse_matrix, test_data, best_k)
+    print("Test Accuracy: {}".format(test_acc))
+
+
+    # item_based 
+    for k in item_based_k_values:
         print("\nk = {}:".format(k))
         acc = knn_impute_by_item(sparse_matrix, val_data, k)
-        val_accuracy.append(acc)
+        item_based_val_accuracy.append(acc)
     
-    # Find the best k value
-    best_k = k_values[np.argmax(val_accuracy)]
-    print("\nBest k: {}".format(best_k))
-    
+    best_k = item_based_k_values[np.argmax(item_based_val_accuracy)]
+    print("\nItem-based best k : {}".format(best_k))
+    plot_result(item_based_k_values, item_based_val_accuracy, "item_based")
+
     # Evaluate on test set with the best k value
     print("\nUsing k = {} on test set:".format(best_k))
     test_acc = knn_impute_by_item(sparse_matrix, test_data, best_k)
