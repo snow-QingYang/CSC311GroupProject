@@ -5,7 +5,7 @@ from utils import (
     load_train_sparse,
 )
 import numpy as np
-
+import matplotlib.pyplot as plt
 
 def sigmoid(x):
     """Apply sigmoid function."""
@@ -113,6 +113,8 @@ def irt(data, val_data, lr, iterations):
     beta = np.random.normal(0, 1, len(data["question_id"]))
 
     val_acc_lst = []
+    train_lld = []
+    val_lld = []
 
     for i in range(iterations):
         neg_lld = neg_log_likelihood(data, theta=theta, beta=beta)
@@ -120,9 +122,12 @@ def irt(data, val_data, lr, iterations):
         val_acc_lst.append(score)
         print("NLLK: {} \t Score: {}".format(neg_lld, score))
         theta, beta = update_theta_beta(data, lr, theta, beta)
+        val_neg_lld = neg_log_likelihood(val_data, theta=theta, beta=beta) 
+        train_lld.append(neg_lld)
+        val_lld.append(val_neg_lld)
 
     # TODO: You may change the return values to achieve what you want.
-    return theta, beta, val_acc_lst
+    return theta, beta, val_acc_lst, train_lld, val_lld
 
 
 def evaluate(data, theta, beta):
@@ -142,7 +147,31 @@ def evaluate(data, theta, beta):
         pred.append(p_a >= 0.5)
     return np.sum((data["is_correct"] == np.array(pred))) / len(data["is_correct"])
 
+def plot_figure(train_loglikelihood, val_loglikelihood):
+    plt.figure(figsize=(10, 6))
+    plt.plot(train_loglikelihood, label='Training Log-likelihood')
+    plt.plot(val_loglikelihood, label='Validation Log-likelihood')
+    plt.xlabel('Iterations')
+    plt.ylabel('Negative Log-likelihood')
+    plt.title('Training and Validation Negative Log-likelihoods')
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("img")
+    plt.clf()
+def plot_curve(beta, questions):
+    theta = np.linspace(-4, 4, 50)
+    for i in questions:
+        ith_beta = beta[i]
+        p = 1 - 1 / (1 + np.exp((theta - ith_beta)))
+        plt.plot(theta, p, label=f'Question {i + 1}')
 
+    plt.xlabel("($\\theta$)")
+    plt.ylabel("Probability of Correct Response")
+    plt.title("Probability of Correct Response vs ($\\theta$)")
+    plt.legend()
+    plt.grid(True)
+    plt.savefig("curve")
+    plt.clf()
 def main():
     train_data = load_train_csv("./data")
     # You may optionally use the sparse matrix.
@@ -157,19 +186,20 @@ def main():
     #####################################################################
     # Try different learning rates and iterations
     learning_rates = [0.001, 0.002, 0.005]
-    iterations_list = [10, 20, 30]
+    iterations_list = [100, 200]
     
     best_val_acc = 0
     best_lr = 0
     best_iter = 0
     best_theta = None 
     best_beta = None
-    
+    best_train_lld = None
+    best_val_lld = None
     # Grid search for best parameters
     for lr in learning_rates:
         for iteration in iterations_list:
             print(f"\nLearning rate={lr}, Iterations={iteration}:")
-            theta, beta, val_acc_lst = irt(train_data, val_data, lr, iteration)
+            theta, beta, val_acc_lst, train_lld, val_lld = irt(train_data, val_data, lr, iteration)
             
             # Record best results
             if val_acc_lst[-1] > best_val_acc:
@@ -178,15 +208,17 @@ def main():
                 best_iter = iteration
                 best_theta = theta
                 best_beta = beta
-                
+                best_train_lld = train_lld
+                best_val_lld = val_lld
     print(f"\nBest parameters:")
     print(f"Learning rate: {best_lr}")
     print(f"Number of iterations: {best_iter}")
     print(f"Validation accuracy: {best_val_acc}")
-    
+    plot_figure(best_train_lld, best_val_lld)
     # Evaluate on test set using best parameters
     test_acc = evaluate(test_data, best_theta, best_beta)
     print(f"Test accuracy: {test_acc}")
+
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -195,7 +227,8 @@ def main():
     # TODO:                                                             #
     # Implement part (d)                                                #
     #####################################################################
-    pass
+    questions = [11, 23, 26]
+    plot_curve(beta, questions)
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################

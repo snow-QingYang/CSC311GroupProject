@@ -115,16 +115,16 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             output = model(inputs)
 
             # Mask the target to only compute the gradient of valid entries.
-            nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
+            nan_mask = torch.isnan(train_data[user_id].unsqueeze(0))
             target[nan_mask] = output[nan_mask]
             
 
             loss = torch.sum((output - target) ** 2.0)
             
             
-            # Adding Regularizater to Loss 
-            regularization_loss = (torch.norm(model.g.weight, 2) ** 2 + torch.norm(model.h.weight, 2) ** 2) / 2.0
-            loss += lamb * regularization_loss
+            # Adding Refularizater to Loss 
+            regularization_loss = lamb * model.get_weight_norm()
+            loss += regularization_loss
             
             loss.backward()
 
@@ -140,62 +140,6 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
-    
-def train2(model, lr, train_data, zero_train_data, valid_data, num_epoch):
-    """Train the neural network, where the objective also includes
-    a regularizer.
-
-    :param model: Module
-    :param lr: float
-    :param lamb: float
-    :param train_data: 2D FloatTensor
-    :param zero_train_data: 2D FloatTensor
-    :param valid_data: Dict
-    :param num_epoch: int
-    :return: None
-    """
-    # TODO: Add a regularizer to the cost function.
-
-    # Tell PyTorch you are training the model.
-    model.train()
-
-    # Define optimizers and loss function.
-    optimizer = optim.SGD(model.parameters(), lr=lr)
-    num_student = train_data.shape[0]
-
-    for epoch in range(0, num_epoch):
-        train_loss = 0.0
-
-        for user_id in range(num_student):
-            inputs = Variable(zero_train_data[user_id]).unsqueeze(0)
-            target = inputs.clone()
-
-            optimizer.zero_grad()
-            output = model(inputs)
-
-            # Mask the target to only compute the gradient of valid entries.
-            nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
-            target[nan_mask] = output[nan_mask]
-            
-
-            loss = torch.sum((output - target) ** 2.0)
-        
-            
-            loss.backward()
-
-            train_loss += loss.item()
-            optimizer.step()
-
-        valid_acc = evaluate(model, zero_train_data, valid_data)
-        print(
-            "Epoch: {} \tTraining Cost: {:.6f}\t " "Valid Acc: {}".format(
-                epoch, train_loss, valid_acc
-            )
-        )
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
-
 
 
 def evaluate(model, train_data, valid_data):
@@ -233,27 +177,34 @@ def main():
     # validation set.                                                   #
     #####################################################################
     # Set model hyperparameters.
-    k = None
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    print(device)
+    zero_train_matrix_gpu = zero_train_matrix.to(device)
+    train_matrix_gpu = train_matrix.to(device)
+    # possible k = 
+    k = 10
     model = None
     
     best_k = None
     best_valid_acc = 0
 
     # Set optimization hyperparameters.
-    lr = 0.01
-    num_epoch = 50
-    lamb = 1
+    lr = 0.03
+    num_epoch = 100
+    lamb = 0
     
-    for k in [50]:
+    for k in [10, 50, 100, 200, 500]:
         print(f"Trying k = {k}")
-        num_question = zero_train_matrix.shape[1]  # Number of questions
-        model = AutoEncoder(num_question, k)  # Pass num_question and k
+        num_question = zero_train_matrix_gpu.shape[1]  # Number of questions
+        model = AutoEncoder(num_question, k).to(device)  # Pass num_question and k
        
 
-        train(model, lr, lamb, train_matrix, zero_train_matrix, valid_data, num_epoch)
+        train(model, lr, lamb, train_matrix_gpu, zero_train_matrix_gpu, valid_data, num_epoch)
         # Next, evaluate your network on validation/test data
-        valid_acc = evaluate(model, zero_train_matrix, valid_data)
+        valid_acc = evaluate(model, zero_train_matrix_gpu, valid_data)
         print(f"Validation accuracy for k = {k}: {valid_acc:.4f}")
+        test_acc = evaluate(model, zero_train_matrix, test_data)
+        print(f"Test accuracy for k = {k}: {test_acc:.4f}")
 
         if valid_acc > best_valid_acc:
             best_valid_acc = valid_acc

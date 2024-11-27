@@ -60,8 +60,8 @@ def knn_impute_by_item(matrix, valid_data, k):
     #####################################################################
     return acc
 
-def plot_result(k_values, val_accuracies, name ):
-    plt.plot(k_values, val_accuracies, marker='o')
+def plot_result(k_values, val_accuracies, name):
+    plt.plot(k_values, val_accuracies, marker='o', label=name)
     plt.xlabel("k_value")
     plt.ylabel("Validation Accuracy")
     plt.title("Validation Accuracy vs K")
@@ -101,7 +101,7 @@ def main():
     print("\nUsing k = {} on test set:".format(best_k))
     test_acc = knn_impute_by_user(sparse_matrix, test_data, best_k)
     print("Test Accuracy: {}".format(test_acc))
-
+    plot_result(user_based_k_values, user_based_val_accuracy, "user_based")
 
     # item_based 
     for k in item_based_k_values:
